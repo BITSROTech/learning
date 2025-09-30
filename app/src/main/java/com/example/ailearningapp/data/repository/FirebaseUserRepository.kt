@@ -7,7 +7,9 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
-import com.google.firebase.firestore.ktx.toObject
+import com.google.firebase.firestore.toObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -355,6 +357,16 @@ class FirebaseUserRepository {
         
         try {
             // 학교 통계 업데이트
+            val schoolExists = withContext(Dispatchers.IO) {
+                schoolStatsCollection.document(school).get().await().exists()
+            }
+            
+            if (!schoolExists) {
+                // 학교 통계가 없으면 먼저 생성
+                createSchoolStats(school)
+            }
+            
+            // 통계 업데이트
             db.runTransaction { transaction ->
                 val schoolRef = schoolStatsCollection.document(school)
                 val schoolDoc = transaction.get(schoolRef)
@@ -367,14 +379,21 @@ class FirebaseUserRepository {
                         "totalProblems" to currentProblems + 1,
                         "lastUpdated" to FieldValue.serverTimestamp()
                     ))
-                } else {
-                    // 새로운 학교 통계 생성은 별도 처리
-                    createSchoolStats(school)
                 }
             }.await()
             
             // 학년 통계 업데이트
             val gradeId = "grade_$grade"
+            val gradeExists = withContext(Dispatchers.IO) {
+                gradeStatsCollection.document(gradeId).get().await().exists()
+            }
+            
+            if (!gradeExists) {
+                // 학년 통계가 없으면 먼저 생성
+                createGradeStats(grade)
+            }
+            
+            // 통계 업데이트
             db.runTransaction { transaction ->
                 val gradeRef = gradeStatsCollection.document(gradeId)
                 val gradeDoc = transaction.get(gradeRef)
@@ -387,8 +406,6 @@ class FirebaseUserRepository {
                         "totalProblems" to currentProblems + 1,
                         "lastUpdated" to FieldValue.serverTimestamp()
                     ))
-                } else {
-                    createGradeStats(grade)
                 }
             }.await()
         } catch (e: Exception) {
