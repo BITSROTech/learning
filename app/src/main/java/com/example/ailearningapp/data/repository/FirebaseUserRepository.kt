@@ -144,7 +144,28 @@ class FirebaseUserRepository {
         isCorrect: Boolean
     ): Result<Unit> {
         return try {
-            val profile = getUserProfile(uid) ?: throw Exception("User profile not found")
+            // 프로필이 없으면 기본 프로필 생성
+            var profile = getUserProfile(uid)
+            if (profile == null) {
+                // 기본 프로필 생성
+                val defaultProfile = mapOf(
+                    "uid" to uid,
+                    "email" to "",
+                    "name" to "User",
+                    "provider" to "Unknown",
+                    "school" to "",
+                    "grade" to 1,
+                    "totalScore" to 0,
+                    "solvedProblems" to 0,
+                    "easySolved" to 0,
+                    "mediumSolved" to 0,
+                    "hardSolved" to 0,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+                usersCollection.document(uid).set(defaultProfile).await()
+                profile = getUserProfile(uid) ?: throw Exception("Failed to create user profile")
+            }
             
             // 트랜잭션으로 점수 업데이트
             db.runTransaction { transaction ->
