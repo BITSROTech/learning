@@ -11,6 +11,8 @@ import com.example.ailearningapp.data.repo.GradeFeedback
 import com.example.ailearningapp.data.repo.Problem
 import com.example.ailearningapp.data.repo.ProblemRepository
 import com.example.ailearningapp.navigation.GradeBand
+import com.example.ailearningapp.data.repository.UserProfileRepository
+import com.example.ailearningapp.data.model.DifficultyLevel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -52,6 +54,9 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
 
     // 인앱 OpenAI 레포지토리(원샷 생성)
     private val repo = ProblemRepository(OpenAIInApp())
+    
+    // 사용자 프로필 저장소  
+    private val profileRepo = UserProfileRepository(app)
 
     private val _ui = MutableStateFlow(SolveUiState())
     val uiState = _ui.asStateFlow()
@@ -289,6 +294,16 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }.onSuccess { fb ->
                 _lastFeedback.value = fb
+                
+                // 정답인 경우 점수 추가
+                if (fb.isCorrect) {
+                    viewModelScope.launch {
+                        val difficulty = prob.difficulty ?: 3 // 기본 난이도 3
+                        val level = DifficultyLevel.fromDifficulty(difficulty)
+                        profileRepo.addScore(level)
+                    }
+                }
+                
                 // 제출 완료 후 타이머 정지(선택)
                 pauseGate()
                 onDone()

@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -35,9 +36,13 @@ import com.example.ailearningapp.ui.screens.LoginScreen
 import com.example.ailearningapp.ui.screens.ProblemSolveScreen
 import com.example.ailearningapp.ui.screens.SettingsScreen
 import com.example.ailearningapp.ui.screens.SubjectScreen
+import com.example.ailearningapp.ui.screens.LeaderboardScreen
+import com.example.ailearningapp.ui.screens.ProfileSetupScreen
 import com.example.ailearningapp.ui.theme.AilearningappTheme
 import com.example.ailearningapp.viewmodel.SolveViewModel
 import com.example.ailearningapp.viewmodel.UserViewModel
+import com.example.ailearningapp.data.repository.UserProfileRepository
+import android.content.Context
 
 private const val SOLVE_FLOW = "solve_flow" // 중첩 그래프(문제 풀기 ↔ 피드백) route
 
@@ -56,10 +61,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppRoot() {
     val nav = rememberNavController()
+    val context = LocalContext.current
 
     // 🔒 루트에서 인증 상태 감시
     val userVm: UserViewModel = viewModel()
     val ui by userVm.uiState.collectAsState()
+    
+    // 프로필 상태 감시
+    val profileRepo = remember { UserProfileRepository(context) }
+    val profileData by profileRepo.profileFlow().collectAsState(initial = null to null)
 
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
@@ -72,11 +82,21 @@ fun AppRoot() {
                 launchSingleTop = true
             }
         }
-        // 인증 상태면 로그인 화면에 머물지 않도록 → 홈(학년/수준)으로
+        // 인증 상태면 로그인 화면에 머물지 않도록
         else if (ui.user != null && currentRoute == Routes.LOGIN) {
-            nav.navigate(Routes.GRADE) {
-                popUpTo(nav.graph.findStartDestination().id) { inclusive = true }
-                launchSingleTop = true
+            // 프로필이 없으면 프로필 설정으로
+            val (school, grade) = profileData
+            if (school == null || grade == null) {
+                nav.navigate(Routes.PROFILE_SETUP) {
+                    popUpTo(nav.graph.findStartDestination().id) { inclusive = true }
+                    launchSingleTop = true
+                }
+            } else {
+                // 프로필이 있으면 홈(학년/수준)으로
+                nav.navigate(Routes.GRADE) {
+                    popUpTo(nav.graph.findStartDestination().id) { inclusive = true }
+                    launchSingleTop = true
+                }
             }
         }
     }
@@ -189,7 +209,43 @@ fun AppRoot() {
                                 popUpTo(nav.graph.findStartDestination().id) { inclusive = true }
                                 launchSingleTop = true
                             }
+                        },
+                        onOpenProfile = {
+                            nav.navigate(Routes.PROFILE_SETUP)
+                        },
+                        onOpenLeaderboard = {
+                            nav.navigate(Routes.LEADERBOARD)
                         }
+                    )
+                }
+                
+                // 리더보드 화면
+                composable(Routes.LEADERBOARD) {
+                    LeaderboardScreen(
+                        onBack = { nav.popBackStack() }
+                    )
+                }
+                
+                // 프로필 설정 화면
+                composable(Routes.PROFILE_SETUP) {
+                    // 최초 설정인지 확인
+                    val (school, grade) = profileData
+                    val isInitial = school == null || grade == null
+                    
+                    ProfileSetupScreen(
+                        onComplete = { 
+                            if (isInitial) {
+                                // 최초 설정 후 홈으로
+                                nav.navigate(Routes.GRADE) {
+                                    popUpTo(nav.graph.findStartDestination().id) { inclusive = true }
+                                    launchSingleTop = true
+                                }
+                            } else {
+                                // 수정 후 뒤로가기
+                                nav.popBackStack() 
+                            }
+                        },
+                        isInitialSetup = isInitial
                     )
                 }
             }
