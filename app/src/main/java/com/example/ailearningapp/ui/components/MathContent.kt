@@ -21,6 +21,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import android.graphics.Color as AndroidColor
 import java.util.regex.Pattern
 import kotlin.math.*
 
@@ -430,6 +433,123 @@ fun MathText(
 }
 
 /* -------------------- 도형 렌더러 -------------------- */
+
+/**
+ * SVG 콘텐츠를 WebView로 렌더링
+ */
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun SvgDiagramBox(
+    svgContent: String,
+    modifier: Modifier = Modifier
+) {
+    val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
+    val backgroundColor = if (isDarkTheme) "#1a1a1a" else "#ffffff"
+    val strokeColor = if (isDarkTheme) "#e5e5e5" else "#374151"
+    
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        AndroidView(
+            factory = { context ->
+                WebView(context).apply {
+                    webViewClient = WebViewClient()
+                    settings.apply {
+                        javaScriptEnabled = true
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                        setSupportZoom(false)
+                        builtInZoomControls = false
+                        displayZoomControls = false
+                    }
+                    setBackgroundColor(AndroidColor.parseColor(backgroundColor))
+                }
+            },
+            update = { webView ->
+                val processedSvg = processSvgContent(svgContent, strokeColor)
+                val html = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                        <style>
+                            body {
+                                margin: 0;
+                                padding: 10px;
+                                background-color: $backgroundColor;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                min-height: 100vh;
+                                box-sizing: border-box;
+                            }
+                            svg {
+                                max-width: 100%;
+                                height: auto;
+                                display: block;
+                            }
+                            /* 기본 스타일 */
+                            line, path, circle, rect, ellipse, polygon, polyline {
+                                stroke: $strokeColor;
+                                stroke-width: 2;
+                                fill: none;
+                            }
+                            text {
+                                fill: $strokeColor;
+                                font-family: 'Noto Sans KR', sans-serif;
+                                font-size: 14px;
+                            }
+                            /* 채워진 도형 */
+                            .filled {
+                                fill: $strokeColor;
+                                fill-opacity: 0.2;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        $processedSvg
+                    </body>
+                    </html>
+                """.trimIndent()
+                
+                webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            }
+        )
+    }
+}
+
+/**
+ * SVG 콘텐츠 처리 및 스타일 적용
+ */
+private fun processSvgContent(svg: String, strokeColor: String): String {
+    var processed = svg
+    
+    // viewBox가 없으면 추가
+    if (!processed.contains("viewBox", ignoreCase = true)) {
+        processed = processed.replace(
+            Regex("<svg([^>]*)>", RegexOption.IGNORE_CASE),
+            "<svg$1 viewBox=\"0 0 400 400\">"
+        )
+    }
+    
+    // 기본 스타일 적용
+    if (!processed.contains("stroke=", ignoreCase = true)) {
+        processed = processed.replace(
+            Regex("<(line|path|circle|rect|ellipse|polygon|polyline)([^>]*)>", RegexOption.IGNORE_CASE)
+        ) { matchResult ->
+            val tag = matchResult.groupValues[1]
+            val attrs = matchResult.groupValues[2]
+            if (!attrs.contains("stroke")) {
+                "<$tag$attrs stroke=\"$strokeColor\">"
+            } else {
+                matchResult.value
+            }
+        }
+    }
+    
+    return processed
+}
 
 /**
  * 향상된 Canvas 기반 도형 렌더러
