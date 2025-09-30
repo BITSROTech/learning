@@ -65,11 +65,11 @@ class UserProfileRepository(private val context: Context) {
         
         // Firebase에도 저장
         val firebaseUser = FirebaseAuth.getInstance().currentUser
-        val currentUser = com.example.ailearningapp.data.local.AuthStore.get(context)
+        val currentUser = com.example.ailearningapp.data.local.AuthStore.currentUserOnce(context)
         
         // Firebase Auth UID가 없으면 Kakao 사용자일 가능성
-        val uid = firebaseUser?.uid ?: currentUser?.let { 
-            if (it.isKakao) "kakao:${it.uid}" else null 
+        val uid = firebaseUser?.uid ?: currentUser?.let { user ->
+            if (user.isKakao) "kakao:${user.uid}" else null 
         }
         
         if (uid != null) {

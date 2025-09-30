@@ -314,12 +314,11 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
                     // Firebase 저장
                     // Firebase Auth UID 또는 대체 ID 사용
                     val firebaseUser = FirebaseAuth.getInstance().currentUser
-                    val authStore = com.example.ailearningapp.data.local.AuthStore
-                    val currentUser = authStore.get(getApplication())
+                    val currentUser = com.example.ailearningapp.data.local.AuthStore.currentUserOnce(getApplication())
                     
                     // Firebase Auth UID가 없으면 Kakao 사용자일 가능성
-                    val uid = firebaseUser?.uid ?: currentUser?.let { 
-                        if (it.isKakao) "kakao:${it.uid}" else null 
+                    val uid = firebaseUser?.uid ?: currentUser?.let { user ->
+                        if (user.isKakao) "kakao:${user.uid}" else null 
                     }
                     
                     Log.d("SolveViewModel", "Firebase 저장 시도 - uid: $uid, currentUser: ${currentUser?.provider}, firebaseUser: ${firebaseUser?.uid}")
