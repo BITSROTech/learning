@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import java.io.IOException
+import com.google.firebase.auth.FirebaseAuth
 
 private val Context.userProfileDataStore by preferencesDataStore("user_profile")
 
@@ -18,6 +19,9 @@ private val Context.userProfileDataStore by preferencesDataStore("user_profile")
  * 사용자 프로필 및 점수 관리 Repository
  */
 class UserProfileRepository(private val context: Context) {
+    
+    // Firebase 연동을 위한 FirebaseUserRepository 추가
+    private val firebaseUserRepo = FirebaseUserRepository()
     
     companion object {
         private val KEY_SCHOOL = stringPreferencesKey("school")
@@ -53,14 +57,21 @@ class UserProfileRepository(private val context: Context) {
      * 학교와 학년 동시 저장
      */
     suspend fun saveProfile(school: String, grade: Int) {
+        // 로컬 저장
         dataStore.edit { preferences ->
             preferences[KEY_SCHOOL] = school
             preferences[KEY_GRADE] = grade.coerceIn(1, 12)
         }
+        
+        // Firebase에도 저장
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid != null) {
+            firebaseUserRepo.updateUserProfile(uid, school, grade)
+        }
     }
     
     /**
-     * 문제 정답시 점수 추가
+     * 문제 정답시 점수 추가 (로컬만, Firebase는 SolveViewModel에서 처리)
      */
     suspend fun addScore(difficultyLevel: DifficultyLevel) {
         dataStore.edit { preferences ->
@@ -86,6 +97,8 @@ class UserProfileRepository(private val context: Context) {
                 }
             }
         }
+        
+        // 주의: Firebase 점수 업데이트는 SolveViewModel에서 문제 정보와 함께 처리
     }
     
     /**

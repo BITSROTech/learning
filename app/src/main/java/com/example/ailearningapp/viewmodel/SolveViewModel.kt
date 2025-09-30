@@ -12,7 +12,9 @@ import com.example.ailearningapp.data.repo.Problem
 import com.example.ailearningapp.data.repo.ProblemRepository
 import com.example.ailearningapp.navigation.GradeBand
 import com.example.ailearningapp.data.repository.UserProfileRepository
+import com.example.ailearningapp.data.repository.FirebaseUserRepository
 import com.example.ailearningapp.data.model.DifficultyLevel
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -57,6 +59,9 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
     
     // 사용자 프로필 저장소  
     private val profileRepo = UserProfileRepository(app)
+    
+    // Firebase 사용자 저장소
+    private val firebaseUserRepo = FirebaseUserRepository()
 
     private val _ui = MutableStateFlow(SolveUiState())
     val uiState = _ui.asStateFlow()
@@ -295,12 +300,29 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
             }.onSuccess { fb ->
                 _lastFeedback.value = fb
                 
-                // 정답인 경우 점수 추가
-                if (fb.isCorrect) {
-                    viewModelScope.launch {
-                        val difficulty = prob.difficulty ?: 3 // 기본 난이도 3
-                        val level = DifficultyLevel.fromDifficulty(difficulty)
+                // 점수 추가 및 Firebase 저장
+                viewModelScope.launch {
+                    val difficulty = prob.difficulty ?: 3 // 기본 난이도 3
+                    val level = DifficultyLevel.fromDifficulty(difficulty)
+                    
+                    // 로컬 저장
+                    if (fb.isCorrect) {
                         profileRepo.addScore(level)
+                    }
+                    
+                    // Firebase 저장
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid
+                    if (uid != null) {
+                        firebaseUserRepo.addScore(
+                            uid = uid,
+                            difficultyLevel = level,
+                            subject = subject,
+                            problemText = prob.body,
+                            userAnswer = finalAnswer,
+                            correctAnswer = prob.answer,
+                            elapsedSeconds = u.elapsedSec,
+                            isCorrect = fb.isCorrect
+                        )
                     }
                 }
                 

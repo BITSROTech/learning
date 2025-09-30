@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import com.example.ailearningapp.data.model.*
 import com.example.ailearningapp.data.repository.LeaderboardRepository
 import com.example.ailearningapp.data.repository.UserProfileRepository
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -44,20 +46,31 @@ fun LeaderboardScreen(
     val pagerState = rememberPagerState(pageCount = { 3 })
     val tabTitles = listOf("전체 순위", "학교별 순위", "학년별 순위")
     
-    // 데이터 로드
+    // 실시간 데이터 로드
     LaunchedEffect(Unit) {
         isLoading = true
+        
+        // 로컬 프로필 데이터 로드
+        userProfile = profileRepo.getUserData()
+        
+        // Firebase에서 실시간 리더보드 데이터 구독
+        leaderboardRepo.getLeaderboardFlow().collectLatest { data ->
+            leaderboardData = data
+            isLoading = false
+        }
+    }
+    
+    // 초기 데이터 로드 (Flow가 시작되기 전)
+    LaunchedEffect(Unit) {
         try {
-            userProfile = profileRepo.getUserData()
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
             leaderboardData = leaderboardRepo.getLeaderboardData(
-                currentUserId = "current_user", // 실제 구현시 현재 사용자 ID 사용
+                currentUserId = uid,
                 currentUserSchool = userProfile?.school,
                 currentUserGrade = userProfile?.grade
             )
         } catch (e: Exception) {
             // 에러 처리
-        } finally {
-            isLoading = false
         }
     }
     
