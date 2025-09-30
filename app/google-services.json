@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "746195747613",
+    "project_id": "edupro-cdb50",
+    "storage_bucket": "edupro-cdb50.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:746195747613:android:a52fd6460c85a7aade17f4",
+        "android_client_info": {
+          "package_name": "com.example.ailearningapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "746195747613-6grc5ksdb7hguj1mmemu9pcqs600up50.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ailearningapp",
+            "certificate_hash": "b851c0d271456b4aa5366e38aa6eb234d80ac17f"
+          }
+        },
+        {
+          "client_id": "746195747613-91u7cnkltpkeph4045gkaq00sirgb63t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAM--Mbhb_1C6I35LEkYKwxgna_lmbK1RQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "746195747613-91u7cnkltpkeph4045gkaq00sirgb63t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

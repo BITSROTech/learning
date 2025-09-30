@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">AIlearning</string>
+    <string name="gateway_base_url">https://ai-gateway-738082237622.asia-northeast3.run.app/</string>
+    <!-- ✅ Kakao 네이티브 앱키 (숫자/영문 32자) -->
+    <string name="kakao_app_key">e6516b5fbe41b9722b038ccdbcd67d25</string>
+</resources>
