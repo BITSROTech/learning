@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/ailearningapp/ui/components/MathContent.kt
+// app/src/main/java/com/example/ailearningapp/ui/components/MathContentEnhanced.kt
 package com.example.ailearningapp.ui.components
 
 import android.annotation.SuppressLint
@@ -13,28 +13,71 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.regex.Pattern
-import kotlin.math.min
-import kotlin.math.roundToInt
+import kotlin.math.*
 
-/** 문제 본문에서 diagram 코드블록을 추출한다. (도형스크립트 or null, 도형블록 제거된 텍스트) */
-private fun extractDiagramBlock(raw: String): Pair<String?, String> {
-    val regex = Regex("```diagram\\s*([\\s\\S]*?)```", RegexOption.IGNORE_CASE)
-    val m = regex.find(raw)
-    return if (m != null) {
-        val script = m.groupValues[1].trim()
-        val stripped = raw.replaceRange(m.range, "").trim()
-        script to stripped
-    } else {
-        null to raw
+/** 도형 타입 열거형 */
+private enum class DiagramType {
+    BASIC,    // 기존의 단순 도형 (LINE, RECT, CIRCLE)
+    ENHANCED, // 향상된 도형 (TRIANGLE, POLYGON, ARC 등)
+    SVG       // SVG 형식
+}
+
+/** 
+ * 문제 본문에서 diagram 코드블록을 추출한다.
+ * SVG 블록도 함께 감지하여 처리한다.
+ * 반환: (도형스크립트 or null, 도형타입 or null, 도형블록 제거된 텍스트)
+ */
+private fun extractDiagramBlock(raw: String): Triple<String?, DiagramType?, String> {
+    // SVG 블록 체크
+    val svgRegex = Regex("```svg\\s*([\\s\\S]*?)```", RegexOption.IGNORE_CASE)
+    val svgMatch = svgRegex.find(raw)
+    if (svgMatch != null) {
+        val svgContent = svgMatch.groupValues[1].trim()
+        val stripped = raw.replaceRange(svgMatch.range, "").trim()
+        return Triple(svgContent, DiagramType.SVG, stripped)
     }
+    
+    // 기존 diagram 블록 체크
+    val diagramRegex = Regex("```diagram\\s*([\\s\\S]*?)```", RegexOption.IGNORE_CASE)
+    val diagramMatch = diagramRegex.find(raw)
+    if (diagramMatch != null) {
+        val script = diagramMatch.groupValues[1].trim()
+        val stripped = raw.replaceRange(diagramMatch.range, "").trim()
+        // 스크립트 내용을 분석하여 적절한 타입 결정
+        val type = determineDiagramType(script)
+        return Triple(script, type, stripped)
+    }
+    
+    return Triple(null, null, raw)
+}
+
+/** 
+ * 도형 스크립트를 분석하여 적절한 렌더러 타입을 결정한다.
+ */
+private fun determineDiagramType(script: String): DiagramType {
+    val lines = script.lines()
+    for (line in lines) {
+        val trimmed = line.trim().uppercase()
+        if (trimmed.startsWith("TRIANGLE") || 
+            trimmed.startsWith("POLYGON") || 
+            trimmed.startsWith("ARC") ||
+            trimmed.startsWith("TEXT") ||
+            trimmed.startsWith("ELLIPSE") ||
+            trimmed.startsWith("PATH") ||
+            trimmed.contains("FILLED")) {
+            return DiagramType.ENHANCED
+        }
+    }
+    return DiagramType.BASIC
 }
 
 /** 입력 문자열에 섞여온 리터럴 개행 표기(\n, \\n 등)를 실제 줄바꿈으로 교정 */
@@ -389,6 +432,356 @@ fun MathText(
 /* -------------------- 도형 렌더러 -------------------- */
 
 /**
+ * 향상된 Canvas 기반 도형 렌더러
+ * 더 많은 도형 타입 지원: TRIANGLE, POLYGON, ARC, ELLIPSE, PATH
+ */
+@Composable
+fun EnhancedDiagramBox(
+    script: String,
+    modifier: Modifier = Modifier,
+    strokeWidth: Float = 2f,
+    color: Color = Color(0xFF374151)
+) {
+    val commands = remember(script) { parseEnhancedDiagram(script) }
+    
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val scale = minOf(width, height) / 100f
+        
+        // 배경 격자 (선택사항)
+        if (false) { // 격자를 원하면 true로 변경
+            drawGrid(scale, color.copy(alpha = 0.05f))
+        }
+        
+        // 도형 렌더링
+        commands.forEach { cmd ->
+            when (cmd) {
+                is DiagramCommand.Line -> {
+                    drawLine(
+                        color = color,
+                        start = Offset(cmd.x1 * scale, cmd.y1 * scale),
+                        end = Offset(cmd.x2 * scale, cmd.y2 * scale),
+                        strokeWidth = strokeWidth
+                    )
+                }
+                is DiagramCommand.Rectangle -> {
+                    drawRect(
+                        color = if (cmd.filled) color.copy(alpha = 0.2f) else color,
+                        topLeft = Offset(cmd.x * scale, cmd.y * scale),
+                        size = Size(cmd.width * scale, cmd.height * scale),
+                        style = if (cmd.filled) Fill else Stroke(width = strokeWidth)
+                    )
+                }
+                is DiagramCommand.Circle -> {
+                    drawCircle(
+                        color = if (cmd.filled) color.copy(alpha = 0.2f) else color,
+                        radius = cmd.radius * scale,
+                        center = Offset(cmd.cx * scale, cmd.cy * scale),
+                        style = if (cmd.filled) Fill else Stroke(width = strokeWidth)
+                    )
+                }
+                is DiagramCommand.Triangle -> {
+                    val path = Path().apply {
+                        moveTo(cmd.x1 * scale, cmd.y1 * scale)
+                        lineTo(cmd.x2 * scale, cmd.y2 * scale)
+                        lineTo(cmd.x3 * scale, cmd.y3 * scale)
+                        close()
+                    }
+                    drawPath(
+                        path = path,
+                        color = if (cmd.filled) color.copy(alpha = 0.2f) else color,
+                        style = if (cmd.filled) Fill else Stroke(width = strokeWidth)
+                    )
+                }
+                is DiagramCommand.Polygon -> {
+                    if (cmd.points.size >= 3) {
+                        val path = Path().apply {
+                            moveTo(cmd.points[0].first * scale, cmd.points[0].second * scale)
+                            cmd.points.drop(1).forEach { (x, y) ->
+                                lineTo(x * scale, y * scale)
+                            }
+                            close()
+                        }
+                        drawPath(
+                            path = path,
+                            color = if (cmd.filled) color.copy(alpha = 0.2f) else color,
+                            style = if (cmd.filled) Fill else Stroke(width = strokeWidth)
+                        )
+                    }
+                }
+                is DiagramCommand.Arc -> {
+                    drawArc(
+                        color = color,
+                        startAngle = cmd.startAngle,
+                        sweepAngle = cmd.sweepAngle,
+                        useCenter = false,
+                        topLeft = Offset((cmd.cx - cmd.radius) * scale, (cmd.cy - cmd.radius) * scale),
+                        size = Size(cmd.radius * 2 * scale, cmd.radius * 2 * scale),
+                        style = Stroke(width = strokeWidth)
+                    )
+                }
+                is DiagramCommand.Ellipse -> {
+                    // 타원 그리기
+                    drawOval(
+                        color = if (cmd.filled) color.copy(alpha = 0.2f) else color,
+                        topLeft = Offset((cmd.cx - cmd.rx) * scale, (cmd.cy - cmd.ry) * scale),
+                        size = Size(cmd.rx * 2 * scale, cmd.ry * 2 * scale),
+                        style = if (cmd.filled) Fill else Stroke(width = strokeWidth)
+                    )
+                }
+                is DiagramCommand.Path -> {
+                    // 경로 그리기
+                    val path = Path().apply {
+                        cmd.commands.forEach { pathCmd ->
+                            when (pathCmd.first.uppercase()) {
+                                "M" -> moveTo(pathCmd.second * scale, pathCmd.third * scale)
+                                "L" -> lineTo(pathCmd.second * scale, pathCmd.third * scale)
+                                "C" -> cubicTo(
+                                    pathCmd.second * scale, pathCmd.third * scale,
+                                    pathCmd.fourth * scale, pathCmd.fifth * scale,
+                                    pathCmd.sixth * scale, pathCmd.seventh * scale
+                                )
+                                "Z" -> close()
+                            }
+                        }
+                    }
+                    drawPath(
+                        path = path,
+                        color = color,
+                        style = Stroke(width = strokeWidth)
+                    )
+                }
+                is DiagramCommand.Text -> {
+                    // 텍스트는 Canvas에서 직접 그리기 어려우므로 skip
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 격자 그리기
+ */
+private fun DrawScope.drawGrid(scale: Float, color: Color) {
+    val step = 10f * scale
+    val width = size.width
+    val height = size.height
+    
+    // 수직선
+    var x = 0f
+    while (x <= width) {
+        drawLine(
+            color = color,
+            start = Offset(x, 0f),
+            end = Offset(x, height),
+            strokeWidth = 1f
+        )
+        x += step
+    }
+    
+    // 수평선
+    var y = 0f
+    while (y <= height) {
+        drawLine(
+            color = color,
+            start = Offset(0f, y),
+            end = Offset(width, y),
+            strokeWidth = 1f
+        )
+        y += step
+    }
+}
+
+/**
+ * 도형 명령어 정의
+ */
+sealed interface DiagramCommand {
+    data class Line(val x1: Float, val y1: Float, val x2: Float, val y2: Float) : DiagramCommand
+    data class Rectangle(val x: Float, val y: Float, val width: Float, val height: Float, val filled: Boolean = false) : DiagramCommand
+    data class Circle(val cx: Float, val cy: Float, val radius: Float, val filled: Boolean = false) : DiagramCommand
+    data class Triangle(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val x3: Float, val y3: Float, val filled: Boolean = false) : DiagramCommand
+    data class Polygon(val points: List<Pair<Float, Float>>, val filled: Boolean = false) : DiagramCommand
+    data class Arc(val cx: Float, val cy: Float, val radius: Float, val startAngle: Float, val sweepAngle: Float) : DiagramCommand
+    data class Ellipse(val cx: Float, val cy: Float, val rx: Float, val ry: Float, val filled: Boolean = false) : DiagramCommand
+    data class Path(val commands: List<PathCommand>) : DiagramCommand
+    data class Text(val x: Float, val y: Float, val text: String, val size: Float = 12f) : DiagramCommand
+}
+
+// PATH 명령을 위한 데이터 클래스
+data class PathCommand(
+    val first: String,
+    val second: Float = 0f,
+    val third: Float = 0f,
+    val fourth: Float = 0f,
+    val fifth: Float = 0f,
+    val sixth: Float = 0f,
+    val seventh: Float = 0f
+)
+
+/**
+ * 향상된 도형 스크립트 파서
+ * 지원 명령어:
+ * - LINE x1 y1 x2 y2
+ * - RECT x y width height [FILLED]
+ * - CIRCLE cx cy radius [FILLED]
+ * - TRIANGLE x1 y1 x2 y2 x3 y3 [FILLED]
+ * - POLYGON x1,y1 x2,y2 x3,y3 ... [FILLED]
+ * - ARC cx cy radius startAngle sweepAngle
+ * - ELLIPSE cx cy rx ry [FILLED]
+ * - PATH M x y L x y C x1 y1 x2 y2 x3 y3 Z
+ * - TEXT x y "텍스트 내용"
+ */
+private fun parseEnhancedDiagram(script: String): List<DiagramCommand> {
+    val commands = mutableListOf<DiagramCommand>()
+    
+    script.lines().forEach { line ->
+        val trimmed = line.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) return@forEach
+        
+        val parts = trimmed.split(Regex("\\s+"))
+        val cmd = parts.firstOrNull()?.uppercase() ?: return@forEach
+        
+        try {
+            when (cmd) {
+                "LINE" -> {
+                    if (parts.size >= 5) {
+                        commands.add(DiagramCommand.Line(
+                            parts[1].toFloat(), parts[2].toFloat(),
+                            parts[3].toFloat(), parts[4].toFloat()
+                        ))
+                    }
+                }
+                "RECT", "RECTANGLE" -> {
+                    if (parts.size >= 5) {
+                        val filled = parts.getOrNull(5)?.uppercase() == "FILLED"
+                        commands.add(DiagramCommand.Rectangle(
+                            parts[1].toFloat(), parts[2].toFloat(),
+                            parts[3].toFloat(), parts[4].toFloat(),
+                            filled
+                        ))
+                    }
+                }
+                "CIRCLE" -> {
+                    if (parts.size >= 4) {
+                        val filled = parts.getOrNull(4)?.uppercase() == "FILLED"
+                        commands.add(DiagramCommand.Circle(
+                            parts[1].toFloat(), parts[2].toFloat(),
+                            parts[3].toFloat(), filled
+                        ))
+                    }
+                }
+                "TRIANGLE" -> {
+                    if (parts.size >= 7) {
+                        val filled = parts.getOrNull(7)?.uppercase() == "FILLED"
+                        commands.add(DiagramCommand.Triangle(
+                            parts[1].toFloat(), parts[2].toFloat(),
+                            parts[3].toFloat(), parts[4].toFloat(),
+                            parts[5].toFloat(), parts[6].toFloat(),
+                            filled
+                        ))
+                    }
+                }
+                "POLYGON" -> {
+                    if (parts.size >= 2) {
+                        val points = mutableListOf<Pair<Float, Float>>()
+                        var i = 1
+                        while (i < parts.size && parts[i] != "FILLED") {
+                            val coords = parts[i].split(",")
+                            if (coords.size == 2) {
+                                points.add(coords[0].toFloat() to coords[1].toFloat())
+                            }
+                            i++
+                        }
+                        val filled = parts.lastOrNull()?.uppercase() == "FILLED"
+                        if (points.size >= 3) {
+                            commands.add(DiagramCommand.Polygon(points, filled))
+                        }
+                    }
+                }
+                "ARC" -> {
+                    if (parts.size >= 6) {
+                        commands.add(DiagramCommand.Arc(
+                            parts[1].toFloat(), parts[2].toFloat(),
+                            parts[3].toFloat(),
+                            parts[4].toFloat(), parts[5].toFloat()
+                        ))
+                    }
+                }
+                "ELLIPSE" -> {
+                    if (parts.size >= 5) {
+                        val filled = parts.getOrNull(5)?.uppercase() == "FILLED"
+                        commands.add(DiagramCommand.Ellipse(
+                            parts[1].toFloat(), parts[2].toFloat(),
+                            parts[3].toFloat(), parts[4].toFloat(),
+                            filled
+                        ))
+                    }
+                }
+                "PATH" -> {
+                    // PATH M 10 10 L 50 50 C 20 20 30 30 40 40 Z
+                    val pathCommands = mutableListOf<PathCommand>()
+                    var i = 1
+                    while (i < parts.size) {
+                        when (parts[i].uppercase()) {
+                            "M", "L" -> {
+                                if (i + 2 < parts.size) {
+                                    pathCommands.add(PathCommand(
+                                        parts[i].uppercase(),
+                                        parts[i + 1].toFloat(),
+                                        parts[i + 2].toFloat()
+                                    ))
+                                    i += 3
+                                } else break
+                            }
+                            "C" -> {
+                                if (i + 6 < parts.size) {
+                                    pathCommands.add(PathCommand(
+                                        "C",
+                                        parts[i + 1].toFloat(),
+                                        parts[i + 2].toFloat(),
+                                        parts[i + 3].toFloat(),
+                                        parts[i + 4].toFloat(),
+                                        parts[i + 5].toFloat(),
+                                        parts[i + 6].toFloat()
+                                    ))
+                                    i += 7
+                                } else break
+                            }
+                            "Z" -> {
+                                pathCommands.add(PathCommand("Z"))
+                                i++
+                            }
+                            else -> i++
+                        }
+                    }
+                    if (pathCommands.isNotEmpty()) {
+                        commands.add(DiagramCommand.Path(pathCommands))
+                    }
+                }
+                "TEXT" -> {
+                    if (parts.size >= 4) {
+                        val textStart = trimmed.indexOf('"')
+                        val textEnd = trimmed.lastIndexOf('"')
+                        if (textStart != -1 && textEnd != -1 && textStart < textEnd) {
+                            val text = trimmed.substring(textStart + 1, textEnd)
+                            commands.add(DiagramCommand.Text(
+                                parts[1].toFloat(), parts[2].toFloat(), text
+                            ))
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // 파싱 오류 무시
+        }
+    }
+    
+    return commands
+}
+
+/**
+ * 기본 도형 렌더러 (하위 호환성 유지)
  * 간단한 도형 DSL:
  * - LINE x1 y1 x2 y2
  * - RECT x y w h
@@ -396,14 +789,14 @@ fun MathText(
  * 좌표는 0..100 기준으로 컨테이너에 스케일링.
  */
 @Composable
-fun DiagramBox(
+fun BasicDiagramBox(
     script: String,
     modifier: Modifier = Modifier,
     stroke: Dp = 2.dp,
     color: Color = Color(0xFF374151),
     grid: Boolean = false
 ) {
-    val cmds = remember(script) { parseDiagram(script) }
+    val cmds = remember(script) { parseBasicDiagram(script) }
     Canvas(modifier = modifier) {
         val s = size
         val scale = min(s.width, s.height) / 100f
@@ -421,22 +814,22 @@ fun DiagramBox(
         val sw = stroke.toPx()
         cmds.forEach { c ->
             when (c) {
-                is Cmd.Line -> drawLine(color = color, start = Offset(c.x1 * scale, c.y1 * scale), end = Offset(c.x2 * scale, c.y2 * scale), strokeWidth = sw)
-                is Cmd.Rect -> drawRect(color = Color.Transparent, topLeft = Offset(c.x * scale, c.y * scale), size = androidx.compose.ui.geometry.Size(c.w * scale, c.h * scale), style = Stroke(width = sw))
-                is Cmd.Circle -> drawCircle(color = Color.Transparent, radius = c.r * scale, center = Offset(c.cx * scale, c.cy * scale), style = Stroke(width = sw))
+                is BasicCmd.Line -> drawLine(color = color, start = Offset(c.x1 * scale, c.y1 * scale), end = Offset(c.x2 * scale, c.y2 * scale), strokeWidth = sw)
+                is BasicCmd.Rect -> drawRect(color = Color.Transparent, topLeft = Offset(c.x * scale, c.y * scale), size = Size(c.w * scale, c.h * scale), style = Stroke(width = sw))
+                is BasicCmd.Circle -> drawCircle(color = Color.Transparent, radius = c.r * scale, center = Offset(c.cx * scale, c.cy * scale), style = Stroke(width = sw))
             }
         }
     }
 }
 
-private sealed interface Cmd {
-    data class Line(val x1: Float, val y1: Float, val x2: Float, val y2: Float) : Cmd
-    data class Rect(val x: Float, val y: Float, val w: Float, val h: Float) : Cmd
-    data class Circle(val cx: Float, val cy: Float, val r: Float) : Cmd
+private sealed interface BasicCmd {
+    data class Line(val x1: Float, val y1: Float, val x2: Float, val y2: Float) : BasicCmd
+    data class Rect(val x: Float, val y: Float, val w: Float, val h: Float) : BasicCmd
+    data class Circle(val cx: Float, val cy: Float, val r: Float) : BasicCmd
 }
 
-private fun parseDiagram(script: String): List<Cmd> {
-    val cmds = mutableListOf<Cmd>()
+private fun parseBasicDiagram(script: String): List<BasicCmd> {
+    val cmds = mutableListOf<BasicCmd>()
     script.lineSequence().forEach { raw ->
         val line = raw.trim().replace(Regex("\\s+"), " ")
         if (line.isBlank() || line.startsWith("#")) return@forEach
@@ -448,24 +841,62 @@ private fun parseDiagram(script: String): List<Cmd> {
             "LINE" -> {
                 val x1 = getF(1); val y1 = getF(2); val x2 = getF(3); val y2 = getF(4)
                 if (x1 != null && y1 != null && x2 != null && y2 != null) {
-                    cmds.add(Cmd.Line(x1, y1, x2, y2))
+                    cmds.add(BasicCmd.Line(x1, y1, x2, y2))
                 }
             }
             "RECT" -> {
                 val x = getF(1); val y = getF(2); val w = getF(3); val h = getF(4)
                 if (x != null && y != null && w != null && h != null) {
-                    cmds.add(Cmd.Rect(x, y, w, h))
+                    cmds.add(BasicCmd.Rect(x, y, w, h))
                 }
             }
             "CIRCLE" -> {
                 val cx = getF(1); val cy = getF(2); val r = getF(3)
                 if (cx != null && cy != null && r != null) {
-                    cmds.add(Cmd.Circle(cx, cy, r))
+                    cmds.add(BasicCmd.Circle(cx, cy, r))
                 }
             }
         }
     }
     return cmds
+}
+
+/**
+ * 도형 렌더러 통합 함수
+ * 도형 타입에 따라 적절한 렌더러를 선택한다.
+ */
+@Composable
+fun DiagramBox(
+    script: String,
+    type: DiagramType,
+    modifier: Modifier = Modifier,
+    stroke: Dp = 2.dp,
+    color: Color = Color(0xFF374151)
+) {
+    when (type) {
+        DiagramType.BASIC -> {
+            BasicDiagramBox(
+                script = script,
+                modifier = modifier,
+                stroke = stroke,
+                color = color
+            )
+        }
+        DiagramType.ENHANCED -> {
+            EnhancedDiagramBox(
+                script = script,
+                modifier = modifier,
+                strokeWidth = stroke.value,
+                color = color
+            )
+        }
+        DiagramType.SVG -> {
+            SvgDiagramBox(
+                svgContent = script,
+                modifier = modifier
+            )
+        }
+    }
 }
 
 /** 문제 본문을 수식/도형 포함해 예쁘게 렌더링 */
@@ -475,13 +906,14 @@ fun ProblemBody(
     modifier: Modifier = Modifier,
     fontSizeSp: Int = 18
 ) {
-    val (diagram, stripped0) = remember(body) { extractDiagramBlock(body) }
+    val (diagram, diagramType, stripped0) = remember(body) { extractDiagramBlock(body) }
     // 🔸 "\n\n" 교정 + 의사수식 오타 교정 후 렌더
     val stripped = remember(stripped0) { fixPseudoMathTypos(normalizeEscapedBreaks(stripped0)) }
     Column(modifier = modifier) {
-        if (!diagram.isNullOrBlank()) {
+        if (!diagram.isNullOrBlank() && diagramType != null) {
             DiagramBox(
                 script = diagram,
+                type = diagramType,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
