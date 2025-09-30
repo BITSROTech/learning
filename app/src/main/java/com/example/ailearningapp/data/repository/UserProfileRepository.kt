@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.flow
 import java.io.IOException
 import com.google.firebase.auth.FirebaseAuth
 
@@ -19,10 +18,10 @@ private val Context.userProfileDataStore by preferencesDataStore("user_profile")
  * 사용자 프로필 및 점수 관리 Repository
  */
 class UserProfileRepository(private val context: Context) {
-    
+
     // Firebase 연동을 위한 FirebaseUserRepository 추가
     private val firebaseUserRepo = FirebaseUserRepository()
-    
+
     companion object {
         private val KEY_SCHOOL = stringPreferencesKey("school")
         private val KEY_GRADE = intPreferencesKey("grade")
@@ -32,9 +31,9 @@ class UserProfileRepository(private val context: Context) {
         private val KEY_MEDIUM_SOLVED = intPreferencesKey("medium_solved")
         private val KEY_HARD_SOLVED = intPreferencesKey("hard_solved")
     }
-    
+
     private val dataStore = context.userProfileDataStore
-    
+
     /**
      * 학교 정보 저장
      */
@@ -43,7 +42,7 @@ class UserProfileRepository(private val context: Context) {
             preferences[KEY_SCHOOL] = school
         }
     }
-    
+
     /**
      * 학년 정보 저장
      */
@@ -52,7 +51,7 @@ class UserProfileRepository(private val context: Context) {
             preferences[KEY_GRADE] = grade.coerceIn(1, 12)
         }
     }
-    
+
     /**
      * 학교와 학년 동시 저장
      */
@@ -62,21 +61,22 @@ class UserProfileRepository(private val context: Context) {
             preferences[KEY_SCHOOL] = school
             preferences[KEY_GRADE] = grade.coerceIn(1, 12)
         }
-        
+
         // Firebase에도 저장
         val firebaseUser = FirebaseAuth.getInstance().currentUser
         val currentUser = com.example.ailearningapp.data.local.AuthStore.currentUserOnce(context)
-        
+
         // Firebase Auth UID가 없으면 Kakao 사용자일 가능성
         val uid = firebaseUser?.uid ?: currentUser?.let { user ->
-            if (user.isKakao) "kakao:${user.uid}" else null 
+            if (user.isKakao) "kakao:${user.uid}" else null
         }
-        
+
         if (uid != null) {
             firebaseUserRepo.updateUserProfile(uid, school, grade)
         }
+
     }
-    
+
     /**
      * 문제 정답시 점수 추가 (로컬만, Firebase는 SolveViewModel에서 처리)
      */
@@ -84,10 +84,10 @@ class UserProfileRepository(private val context: Context) {
         dataStore.edit { preferences ->
             val currentScore = preferences[KEY_TOTAL_SCORE] ?: 0
             val solvedCount = preferences[KEY_SOLVED_PROBLEMS] ?: 0
-            
+
             preferences[KEY_TOTAL_SCORE] = currentScore + difficultyLevel.points
             preferences[KEY_SOLVED_PROBLEMS] = solvedCount + 1
-            
+
             // 난이도별 해결 수 카운트
             when (difficultyLevel) {
                 DifficultyLevel.EASY -> {
@@ -104,10 +104,10 @@ class UserProfileRepository(private val context: Context) {
                 }
             }
         }
-        
+
         // 주의: Firebase 점수 업데이트는 SolveViewModel에서 문제 정보와 함께 처리
     }
-    
+
     /**
      * 프로필 정보 Flow
      */
@@ -127,7 +127,7 @@ class UserProfileRepository(private val context: Context) {
                 )
             }
     }
-    
+
     /**
      * 점수 정보 Flow
      */
@@ -151,7 +151,7 @@ class UserProfileRepository(private val context: Context) {
                 Triple(totalScore, solvedProblems, difficultyStats)
             }
     }
-    
+
     /**
      * 전체 사용자 데이터 가져오기
      */
@@ -167,7 +167,7 @@ class UserProfileRepository(private val context: Context) {
             hardSolved = preferences[KEY_HARD_SOLVED] ?: 0
         )
     }
-    
+
     /**
      * 모든 프로필 데이터 초기화
      */

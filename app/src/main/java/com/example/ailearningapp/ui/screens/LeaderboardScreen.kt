@@ -1,6 +1,7 @@
 // app/src/main/java/com/example/ailearningapp/ui/screens/LeaderboardScreen.kt
 package com.example.ailearningapp.ui.screens
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -11,6 +12,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.ailearningapp.data.model.*
 import com.example.ailearningapp.data.repository.LeaderboardRepository
+import com.example.ailearningapp.data.repository.UserProfileData
 import com.example.ailearningapp.data.repository.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.collectLatest
@@ -80,7 +83,7 @@ fun LeaderboardScreen(
                 title = { Text("리더보드") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "뒤로가기")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
                     }
                 }
             )
@@ -284,6 +287,7 @@ private fun SchoolRankingTab(
     }
 }
 
+@SuppressLint("DefaultLocale")
 @Composable
 private fun SchoolRankItem(
     school: SchoolStats,
@@ -372,6 +376,7 @@ private fun GradeRankingTab(
     }
 }
 
+@SuppressLint("DefaultLocale")
 @Composable
 private fun GradeRankItem(
     grade: GradeStats,

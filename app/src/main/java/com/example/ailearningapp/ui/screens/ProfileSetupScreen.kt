@@ -49,13 +49,15 @@ fun ProfileSetupScreen(
                 title = { 
                     Text(if (isInitialSetup) "프로필 설정" else "프로필 수정")
                 },
-                navigationIcon = if (!isInitialSetup) {
-                    {
-                        TextButton(onClick = onComplete) {
-                            Text("취소")
+                navigationIcon = {
+                    if (!isInitialSetup) {
+                        @androidx.compose.runtime.Composable {
+                            TextButton(onClick = onComplete) {
+                                Text("취소")
+                            }
                         }
-                    }
-                } else null
+                    } else null
+                }
             )
         }
     ) { padding ->

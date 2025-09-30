@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 사용자는 자신의 프로필만 읽고 쓸 수 있음
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (request.auth.uid == userId || 
+         request.auth.uid == resource.data.uid ||
+         request.auth.uid == userId.split(':')[1]); // Kakao 사용자 처리
+    }
+    
+    // 학교 통계는 모든 로그인 사용자가 읽을 수 있고, 시스템만 쓸 수 있음
+    match /schoolStats/{school} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // 학년 통계는 모든 로그인 사용자가 읽을 수 있고, 시스템만 쓸 수 있음
+    match /gradeStats/{grade} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // 문제 풀이 기록은 본인것만 쓸 수 있고, 모두 읽을 수 있음
+    match /solveRecords/{record} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+    }
+  }
+}

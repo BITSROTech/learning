@@ -57,10 +57,10 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
 
     // 인앱 OpenAI 레포지토리(원샷 생성)
     private val repo = ProblemRepository(OpenAIInApp())
-    
+
     // 사용자 프로필 저장소  
     private val profileRepo = UserProfileRepository(app)
-    
+
     // Firebase 사용자 저장소
     private val firebaseUserRepo = FirebaseUserRepository()
 
@@ -300,29 +300,29 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }.onSuccess { fb ->
                 _lastFeedback.value = fb
-                
+
                 // 점수 추가 및 Firebase 저장
                 viewModelScope.launch {
                     val difficulty = prob.difficulty ?: 3 // 기본 난이도 3
                     val level = DifficultyLevel.fromDifficulty(difficulty)
-                    
+
                     // 로컬 저장
                     if (fb.isCorrect) {
                         profileRepo.addScore(level)
                     }
-                    
+
                     // Firebase 저장
                     // Firebase Auth UID 또는 대체 ID 사용
                     val firebaseUser = FirebaseAuth.getInstance().currentUser
                     val currentUser = com.example.ailearningapp.data.local.AuthStore.currentUserOnce(getApplication())
-                    
+
                     // Firebase Auth UID가 없으면 Kakao 사용자일 가능성
                     val uid = firebaseUser?.uid ?: currentUser?.let { user ->
-                        if (user.isKakao) "kakao:${user.uid}" else null 
+                        if (user.isKakao) "kakao:${user.uid}" else null
                     }
-                    
+
                     Log.d("SolveViewModel", "Firebase 저장 시도 - uid: $uid, currentUser: ${currentUser?.provider}, firebaseUser: ${firebaseUser?.uid}")
-                    
+
                     if (uid != null) {
                         val result = firebaseUserRepo.addScore(
                             uid = uid,
@@ -334,7 +334,7 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
                             elapsedSeconds = u.elapsedSec,
                             isCorrect = fb.isCorrect
                         )
-                        
+
                         result.onFailure { e ->
                             Log.e("SolveViewModel", "Firebase 점수 저장 실패: ${e.message}", e)
                         }
@@ -345,7 +345,7 @@ class SolveViewModel(app: Application) : AndroidViewModel(app) {
                         Log.w("SolveViewModel", "UID를 찾을 수 없습니다. currentUser: ${currentUser?.provider}")
                     }
                 }
-                
+
                 // 제출 완료 후 타이머 정지(선택)
                 pauseGate()
                 onDone()
