@@ -25,6 +25,8 @@ object Routes {
     const val GRADE = "grade"
     const val SUBJECT = "subject"
     const val SETTINGS = "settings"
+    const val LEADERBOARD = "leaderboard"
+    const val PROFILE_SETUP = "profile_setup"
 
     // ✅ solve 루트 그래프(공유 ViewModel용 부모 라우트)
     const val SOLVE_ROOT = "solve"

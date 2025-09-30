@@ -17,7 +17,10 @@ data class AuthUser(
     val email: String?,
     val photoUrl: String?,
     val idToken: String?,     // Google: ID Token / Kakao: null
-    val accessToken: String?  // Kakao: Access Token / Google: null
+    val accessToken: String?,  // Kakao: Access Token / Google: null
+    val school: String? = null,  // 사용자의 학교명
+    val grade: Int? = null,  // 사용자의 학년 (1-12)
+    val totalScore: Int = 0  // 사용자의 총 누적 점수
 ) {
     val isGoogle: Boolean get() = provider == AuthProvider.Google
     val isKakao: Boolean get() = provider == AuthProvider.Kakao

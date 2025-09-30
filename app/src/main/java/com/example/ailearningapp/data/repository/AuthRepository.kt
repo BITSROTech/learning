@@ -40,6 +40,9 @@ import com.google.firebase.firestore.SetOptions
 private const val TAG = "AuthRepo"
 
 class AuthRepository(private val ctx: Context) {
+    
+    // Firebase User Repository 추가
+    private val firebaseUserRepo = FirebaseUserRepository()
 
     /* -------------------- Google(Firebase Auth) -------------------- */
 
@@ -175,16 +178,14 @@ class AuthRepository(private val ctx: Context) {
         val firebaseUid = FirebaseAuth.getInstance().currentUser?.uid
         val docId = firebaseUid ?: "kakao:${user.uid ?: "unknown"}"
 
-        val data = hashMapOf(
-            "uid" to docId,
-            "provider" to user.provider.name,
-            "name" to (user.name ?: ""),
-            "email" to (user.email ?: ""),
-            "photoUrl" to (user.photoUrl ?: ""),
-            "updatedAt" to FieldValue.serverTimestamp(),
-            "createdAt" to FieldValue.serverTimestamp()
+        // FirebaseUserRepository를 사용하여 사용자 생성/업데이트
+        firebaseUserRepo.createOrUpdateUser(
+            uid = docId,
+            email = user.email ?: "",
+            name = user.name ?: "",
+            provider = user.provider.name,
+            photoUrl = user.photoUrl
         )
-        firestore.collection("users").document(docId).set(data, SetOptions.merge()).await()
     }
 
     /* -------------------- Kakao -------------------- */

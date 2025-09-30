@@ -72,7 +72,8 @@ class ProblemRepository(
             improvements = r.improvements,
             summary = r.summary,           // OpenAIInApp.grade에서 요약을 이미 조립
             aiConfidence = r.aiConfidence,
-            timeSpent = r.timeSpent
+            timeSpent = r.timeSpent,
+            isCorrect = r.score >= GradeFeedback.CORRECT_THRESHOLD  // 70점 이상이면 정답
         )
     }
 
@@ -101,5 +102,11 @@ data class GradeFeedback(
     val improvements: List<String>,     // 개선 제안
     val summary: String,
     val aiConfidence: Int,
-    val timeSpent: Int
-)
+    val timeSpent: Int,
+    val isCorrect: Boolean = false      // 정답 여부 (점수 기반으로 판단)
+) {
+    companion object {
+        // 70점 이상이면 정답으로 간주
+        const val CORRECT_THRESHOLD = 70
+    }
+}
